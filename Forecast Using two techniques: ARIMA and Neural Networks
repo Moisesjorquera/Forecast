@@ -1,0 +1,97 @@
+#Predicción de precio de acciones con redes neuronales artificiales
+
+# 1.1 Preambulo(Visualización)
+
+#Claramente al momento de analizar, es claro extraer la información clave
+#para tener un análisis claro, preciso y conciso, el paquete quantmod ayuda
+#a esta discusión, para obtener las cotizaciones diarias de cualquier acción
+#siguiendo el nombre a partir de su ticker(En Yahoo Finance aparece claramente la nomenclatura de cada acción)
+
+#Importar librería de extracción de data financiera 
+#Se toma el precio de cierre 
+library(quantmod)
+
+#En este caso se toma la acción del banco de chile, graficado como
+#gráfico de velas japonesas, donde el color verde es cuando la acción está al alza
+#cuando está roja, es cuando la acción está a la baja.
+getSymbols("BCH",sre='google')
+barChart(BCH)
+
+#1.2 Entrenamiento
+
+#Para obtener una predicción precisa, es claro el poder entrenar
+#una proporción significativa de los datos obtenidos, por los mismo
+#se debe ordenar de una manera clara la información.
+
+#Luego se eligen x cantidad de observaciones para probar el desempeño del modelo
+
+df[(nrow(BCH)-num_test_days):nrow(BCH),]
+df.test.values <- df$BCH.Adjusted[1:num_test_days]
+
+
+df <- as.data.frame(BCH)
+
+#¿Cuántos serán los días a predecir? 10 dìas
+
+num_test_days <- 10
+
+
+#Dividir el test de observaciones
+#Elegir la cantidad precisa de observaciones para el entrenamiento
+
+df.train <- df[(nrow(BCH)-200):(nrow(BCH)-num_test_days),]
+df.train$days <- as.Date(row.names(df.train))
+
+#Se eligen las observaciones con las cuales se entrena el modelo(desempeño)
+
+df.train$days <-as.Date(df.train$days)
+
+
+#Graficar Precios de cierre(Gráfico de líneas)
+
+plot(df.train$days,df.train$BCH.Close,type="l",main="Precio Diario de BCH")
+
+#◘2. Forecast
+
+#Para predecir, se definen dos capas ocultas y 500 iteraciones, se usará
+#reescalamiento automático, para ajustar adecuadamente el modelo, cuando
+#scale.inputs = FALSE, el desempeño del modelo es muy bajo en este caso.
+install.packages("forecast")
+library("forecast")
+
+2.1 #Parte de ajuste del modelo(Red Neuronal)
+
+par(mfrow=c(2,1))
+
+fit.nn <- nnetar(df.train$BCH.Close, size = 5, repeats=500, scale.inputs=TRUE)
+
+#Ajuste de las redes neuronales
+
+fcast.nn <- forecast(fit.nn, h = num_test_days)
+
+#Gráfico para las predicciones
+
+plot(fcast.nn)
+lines(fitted(fcast.nn), col="red") #Los datos entrenados se grafican en color rojo
+
+#Tabla resumen para el desempeño del modelo(Lineal)
+
+accuracy.nn <- as.data.frame(accuracy(fcast.nn$mean, x = df.test.values))
+
+2.2 #Ajuste del modelo ARIMA(Autoregresivo en función de la temporalidad y la estacionalidad)
+
+fit.arima <- auto.arima(df.train$BCH.Close)
+fcast.arima <- forecast(fit.arima, h = num_test_days)
+plot(fcast.arima)
+lines(fitted(fit.arima), col = "green")
+
+accuracy.arima <- as.data.frame(accuracy(fcast.arima$mean, x= df.test.values))
+
+
+3. Contraste
+
+#Creación de la tabla entre Red Neuronal y Modelo Arima
+
+accuracy.table <- rbind(accuracy.nn, accuracy.arima)
+row.names(accuracy.table) <- c("Red Neuronal", "ARIMA")
+accuracy.table
